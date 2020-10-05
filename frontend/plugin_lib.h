@@ -1,3 +1,5 @@
+#ifndef __PLUGIN_LIB_H__
+#define __PLUGIN_LIB_H__
 
 enum {
 	DKEY_SELECT = 0,
@@ -24,6 +26,7 @@ extern int multitap2;
 extern int in_analog_left[8][2];
 extern int in_analog_right[8][2];
 extern unsigned short in_keystate[8];
+extern int in_mouse[8][2];
 
 extern int in_adev[2], in_adev_axis[2][2];
 extern int in_adev_is_nublike[2];
@@ -71,6 +74,7 @@ struct rearmed_cbs {
 		int   allow_interlace; // 0 off, 1 on, 2 guess
 		int   enhancement_enable;
 		int   enhancement_no_main;
+		int   allow_dithering;
 	} gpu_neon;
 	struct {
 		int   iUseDither;
@@ -79,9 +83,17 @@ struct rearmed_cbs {
 		int   dwFrameRateTicks;
 	} gpu_peops;
 	struct {
+		int ilace_force;
+		int pixel_skip;
+		int lighting;
+		int fast_lighting;
+		int blending;
+		int dithering;
+		// old gpu_unai config for compatibility
 		int   abe_hack;
 		int   no_light, no_blend;
 		int   lineskip;
+		int   scale_hires;
 	} gpu_unai;
 	struct {
 		int   dwActFixes;
@@ -109,3 +121,5 @@ extern void (*pl_plat_hud_print)(int x, int y, const char *str, int bpp);
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
 #endif
+
+#endif /* __PLUGIN_LIB_H__ */

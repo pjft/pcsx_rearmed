@@ -130,20 +130,29 @@ void emu_set_default_config(void)
 	pl_rearmed_cbs.gpu_neon.enhancement_no_main = 0;
 	pl_rearmed_cbs.gpu_peops.iUseDither = 0;
 	pl_rearmed_cbs.gpu_peops.dwActFixes = 1<<7;
+	pl_rearmed_cbs.gpu_unai.ilace_force = 0;
+	pl_rearmed_cbs.gpu_unai.pixel_skip = 1;
+	pl_rearmed_cbs.gpu_unai.lighting = 1;
+	pl_rearmed_cbs.gpu_unai.fast_lighting = 1;
+	pl_rearmed_cbs.gpu_unai.blending = 1;
+	pl_rearmed_cbs.gpu_unai.dithering = 0;
+	// old gpu_unai config
 	pl_rearmed_cbs.gpu_unai.abe_hack =
 	pl_rearmed_cbs.gpu_unai.no_light =
 	pl_rearmed_cbs.gpu_unai.no_blend = 0;
+	pl_rearmed_cbs.gpu_unai.scale_hires = 0;
 	memset(&pl_rearmed_cbs.gpu_peopsgl, 0, sizeof(pl_rearmed_cbs.gpu_peopsgl));
 	pl_rearmed_cbs.gpu_peopsgl.iVRamSize = 64;
 	pl_rearmed_cbs.gpu_peopsgl.iTexGarbageCollection = 1;
 
 	spu_config.iUseReverb = 1;
+	spu_config.idiablofix = 0;
 	spu_config.iUseInterpolation = 1;
 	spu_config.iXAPitch = 0;
 	spu_config.iVolume = 768;
 	spu_config.iTempo = 0;
 	spu_config.iUseThread = 1; // no effect if only 1 core is detected
-#ifdef HAVE_PRE_ARMV7 /* XXX GPH hack */
+#if defined(HAVE_PRE_ARMV7) && !defined(_3DS) /* XXX GPH hack */
 	spu_config.iUseReverb = 0;
 	spu_config.iUseInterpolation = 0;
 	spu_config.iTempo = 1;
@@ -299,7 +308,7 @@ static int cdidcmp(const char *id1, const char *id2)
 
 static void parse_cwcheat(void)
 {
-	char line[256], buf[64], name[64], *p;
+	char line[256], buf[256], name[256], *p;
 	int newcheat = 1;
 	u32 a, v;
 	FILE *f;
@@ -721,10 +730,10 @@ void SysReset() {
 	// reset can run code, timing must be set
 	pl_timing_prepare(Config.PsxType);
 
-	EmuReset();
-
-	// hmh core forgets this
+   // hmh core forgets this
 	CDR_stop();
+   
+	EmuReset();
 
 	GPU_updateLace = real_lace;
 	g_emu_resetting = 0;
@@ -772,7 +781,7 @@ int emu_save_state(int slot)
 		return ret;
 
 	ret = SaveState(fname);
-#if defined(HAVE_PRE_ARMV7) && !defined(_3DS) /* XXX GPH hack */
+#if defined(HAVE_PRE_ARMV7) && !defined(_3DS) && !defined(__SWITCH__) /* XXX GPH hack */
 	sync();
 #endif
 	SysPrintf("* %s \"%s\" [%d]\n",
@@ -794,6 +803,7 @@ int emu_load_state(int slot)
 	return LoadState(fname);
 }
 
+#ifndef HAVE_LIBRETRO
 #ifndef ANDROID
 
 void SysPrintf(const char *fmt, ...) {
@@ -818,6 +828,7 @@ void SysPrintf(const char *fmt, ...) {
 }
 
 #endif
+#endif /* HAVE_LIBRETRO */
 
 void SysMessage(const char *fmt, ...) {
 	va_list list;
@@ -867,14 +878,15 @@ static int _OpenPlugins(void) {
 
 	if (Config.UseNet && !NetOpened) {
 		netInfo info;
-		char path[MAXPATHLEN];
+		char path[MAXPATHLEN * 2];
 		char dotdir[MAXPATHLEN];
 
 		MAKE_PATH(dotdir, "/.pcsx/plugins/", NULL);
 
 		strcpy(info.EmuName, "PCSX");
-		strncpy(info.CdromID, CdromId, 9);
-		strncpy(info.CdromLabel, CdromLabel, 9);
+		memcpy(info.CdromID, CdromId, 9); /* no \0 trailing character? */
+		memcpy(info.CdromLabel, CdromLabel, 9);
+		info.CdromLabel[9] = '\0';
 		info.psxMem = psxM;
 		info.GPU_showScreenPic = GPU_showScreenPic;
 		info.GPU_displayText = GPU_displayText;

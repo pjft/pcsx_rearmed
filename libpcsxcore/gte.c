@@ -170,7 +170,7 @@
 
 #ifndef FLAGLESS
 
-static inline s32 BOUNDS_(psxCP2Regs *regs, s64 n_value, s64 n_max, int n_maxflag, s64 n_min, int n_minflag) {
+static inline s64 BOUNDS_(psxCP2Regs *regs, s64 n_value, s64 n_max, int n_maxflag, s64 n_min, int n_minflag) {
 	if (n_value > n_max) {
 		gteFLAG |= n_maxflag;
 	} else if (n_value < n_min) {
@@ -258,7 +258,7 @@ static inline u32 limE_(psxCP2Regs *regs, u32 result) {
 
 #ifndef FLAGLESS
 
-static inline u32 MFC2(int reg) {
+u32 MFC2(int reg) {
 	psxCP2Regs *regs = &psxRegs.CP2;
 	switch (reg) {
 		case 1:
@@ -293,7 +293,7 @@ static inline u32 MFC2(int reg) {
 	return psxRegs.CP2D.r[reg];
 }
 
-static inline void MTC2(u32 value, int reg) {
+void MTC2(u32 value, int reg) {
 	psxCP2Regs *regs = &psxRegs.CP2;
 	switch (reg) {
 		case 15:
@@ -339,7 +339,7 @@ static inline void MTC2(u32 value, int reg) {
 	}
 }
 
-static inline void CTC2(u32 value, int reg) {
+void CTC2(u32 value, int reg) {
 	switch (reg) {
 		case 4:
 		case 12:
@@ -404,6 +404,7 @@ static u32 DIVIDE_(s16 n, u16 d) {
 
 void gteRTPS(psxCP2Regs *regs) {
 	int quotient;
+	s64 tmp;
 
 #ifdef GTE_LOG
 	GTE_LOG("GTE RTPS\n");
@@ -426,14 +427,16 @@ void gteRTPS(psxCP2Regs *regs) {
 	gteSX2 = limG1(F((s64)gteOFX + ((s64)gteIR1 * quotient)) >> 16);
 	gteSY2 = limG2(F((s64)gteOFY + ((s64)gteIR2 * quotient)) >> 16);
 
-	gteMAC0 = F((s64)gteDQB + ((s64)gteDQA * quotient));
-	gteIR0 = limH(gteMAC0 >> 12);
+	tmp = (s64)gteDQB + ((s64)gteDQA * quotient);
+	gteMAC0 = F(tmp);
+	gteIR0 = limH(tmp >> 12);
 }
 
 void gteRTPT(psxCP2Regs *regs) {
 	int quotient;
 	int v;
 	s32 vx, vy, vz;
+	s64 tmp;
 
 #ifdef GTE_LOG
 	GTE_LOG("GTE RTPT\n");
@@ -456,8 +459,10 @@ void gteRTPT(psxCP2Regs *regs) {
 		fSX(v) = limG1(F((s64)gteOFX + ((s64)gteIR1 * quotient)) >> 16);
 		fSY(v) = limG2(F((s64)gteOFY + ((s64)gteIR2 * quotient)) >> 16);
 	}
-	gteMAC0 = F((s64)gteDQB + ((s64)gteDQA * quotient));
-	gteIR0 = limH(gteMAC0 >> 12);
+
+	tmp = (s64)gteDQB + ((s64)gteDQA * quotient);
+	gteMAC0 = F(tmp);
+	gteIR0 = limH(tmp >> 12);
 }
 
 void gteMVMVA(psxCP2Regs *regs) {

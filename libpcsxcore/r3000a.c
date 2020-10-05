@@ -30,9 +30,9 @@ R3000Acpu *psxCpu = NULL;
 psxRegisters psxRegs;
 
 int psxInit() {
-	SysPrintf(_("Running PCSX Version %s (%s).\n"), PACKAGE_VERSION, __DATE__);
+	SysPrintf(_("Running PCSX Version %s (%s).\n"), PCSX_VERSION, __DATE__);
 
-#ifdef PSXREC
+#if defined(NEW_DYNAREC) || defined(LIGHTREC)
 	if (Config.Cpu == CPU_INTERPRETER) {
 		psxCpu = &psxInt;
 	} else psxCpu = &psxRec;
@@ -50,7 +50,7 @@ int psxInit() {
 void psxReset() {
 	psxMemReset();
 
-	memset(&psxRegs, 0, sizeof(psxRegs));
+	memset(&psxRegs, 0x00, sizeof(psxRegs));
 
 	psxRegs.pc = 0xbfc00000; // Start in bootstrap
 

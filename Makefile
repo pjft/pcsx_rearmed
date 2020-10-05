@@ -6,7 +6,7 @@ CFLAGS += -Wall -Iinclude -ffast-math
 ifeq ($(DEBUG), 1)
 CFLAGS += -O0 -ggdb
 else
-ifeq ($(platform), vita)
+ifeq ($(platform), $(filter $(platform), vita ctr))
 CFLAGS += -O3 -DNDEBUG
 else
 CFLAGS += -O2 -DNDEBUG
@@ -52,6 +52,23 @@ OBJS += libpcsxcore/cdriso.o libpcsxcore/cdrom.o libpcsxcore/cheat.o libpcsxcore
 	libpcsxcore/psxhw.o libpcsxcore/psxinterpreter.o libpcsxcore/psxmem.o libpcsxcore/r3000a.o \
 	libpcsxcore/sio.o libpcsxcore/socket.o libpcsxcore/spu.o
 OBJS += libpcsxcore/gte.o libpcsxcore/gte_nf.o libpcsxcore/gte_divider.o
+ifeq ($(WANT_ZLIB),1)
+CFLAGS += -Ideps/zlib
+OBJS += deps/zlib/adler32.o \
+        deps/zlib/compress.o \
+        deps/zlib/crc32.o \
+        deps/zlib/deflate.o \
+        deps/zlib/gzclose.o \
+        deps/zlib/gzlib.o \
+        deps/zlib/gzread.o \
+        deps/zlib/gzwrite.o \
+        deps/zlib/inffast.o \
+        deps/zlib/inflate.o \
+        deps/zlib/inftrees.o \
+        deps/zlib/trees.o \
+        deps/zlib/uncompr.o \
+        deps/zlib/zutil.o
+endif
 ifeq "$(ARCH)" "arm"
 OBJS += libpcsxcore/gte_arm.o
 endif
@@ -61,16 +78,44 @@ endif
 libpcsxcore/psxbios.o: CFLAGS += -Wno-nonnull
 
 # dynarec
-ifeq "$(USE_DYNAREC)" "1"
-OBJS += libpcsxcore/new_dynarec/new_dynarec.o libpcsxcore/new_dynarec/arm/linkage_arm.o
-OBJS += libpcsxcore/new_dynarec/backends/psx/pcsxmem.o
+ifeq "$(DYNAREC)" "lightrec"
+CFLAGS += -Ideps/lightning/include -Ideps/lightrec \
+		  -DLIGHTREC -DLIGHTREC_STATIC
+OBJS += libpcsxcore/lightrec/plugin.o
+OBJS += deps/lightning/lib/jit_disasm.o \
+		deps/lightning/lib/jit_memory.o \
+		deps/lightning/lib/jit_names.o \
+		deps/lightning/lib/jit_note.o \
+		deps/lightning/lib/jit_print.o \
+		deps/lightning/lib/jit_size.o \
+		deps/lightning/lib/lightning.o \
+		deps/lightrec/blockcache.o \
+		deps/lightrec/disassembler.o \
+		deps/lightrec/emitter.o \
+		deps/lightrec/interpreter.o \
+		deps/lightrec/lightrec.o \
+		deps/lightrec/memmanager.o \
+		deps/lightrec/optimizer.o \
+		deps/lightrec/regcache.o \
+		deps/lightrec/recompiler.o \
+		deps/lightrec/reaper.o
+ifeq ($(MMAP_WIN32),1)
+CFLAGS += -Ideps/mman
+OBJS += deps/mman/mman.o
+endif
+else ifeq "$(DYNAREC)" "ari64"
+CFLAGS += -DNEW_DYNAREC
+OBJS += libpcsxcore/new_dynarec/backends/psx/emu_if.o \
+		libpcsxcore/new_dynarec/new_dynarec.o \
+		libpcsxcore/new_dynarec/arm/linkage_arm.o \
+		libpcsxcore/new_dynarec/backends/psx/pcsxmem.o
+libpcsxcore/new_dynarec/new_dynarec.o: libpcsxcore/new_dynarec/arm/assem_arm.c \
+	libpcsxcore/new_dynarec/backends/psx/pcsxmem_inline.c
 else
+OBJS += libpcsxcore/new_dynarec/backends/psx/emu_if.o
 libpcsxcore/new_dynarec/backends/psx/emu_if.o: CFLAGS += -DDRC_DISABLE
 frontend/libretro.o: CFLAGS += -DDRC_DISABLE
 endif
-OBJS += libpcsxcore/new_dynarec/backends/psx/emu_if.o
-libpcsxcore/new_dynarec/new_dynarec.o: libpcsxcore/new_dynarec/arm/assem_arm.c \
-	libpcsxcore/new_dynarec/backends/psx/pcsxmem_inline.c
 ifdef DRC_DBG
 libpcsxcore/new_dynarec/backends/psx/emu_if.o: CFLAGS += -D_FILE_OFFSET_BITS=64
 CFLAGS += -DDRC_DBG
@@ -119,17 +164,28 @@ endif
 # builtin gpu
 OBJS += plugins/gpulib/gpu.o plugins/gpulib/vout_pl.o
 ifeq "$(BUILTIN_GPU)" "neon"
-OBJS += plugins/gpu_neon/psx_gpu_if.o plugins/gpu_neon/psx_gpu/psx_gpu_arm_neon.o
+CFLAGS += -DGPU_NEON
+OBJS += plugins/gpu_neon/psx_gpu_if.o
+ifeq "$(HAVE_NEON)" "1"
+OBJS += plugins/gpu_neon/psx_gpu/psx_gpu_arm_neon.o
 plugins/gpu_neon/psx_gpu_if.o: CFLAGS += -DNEON_BUILD -DTEXTURE_CACHE_4BPP -DTEXTURE_CACHE_8BPP
+else
+plugins/gpu_neon/psx_gpu_if.o: CFLAGS += -DTEXTURE_CACHE_4BPP -DTEXTURE_CACHE_8BPP
+endif
 plugins/gpu_neon/psx_gpu_if.o: plugins/gpu_neon/psx_gpu/*.c
 endif
 ifeq "$(BUILTIN_GPU)" "peops"
+CFLAGS += -DGPU_PEOPS
 # note: code is not safe for strict-aliasing? (Castlevania problems)
 plugins/dfxvideo/gpulib_if.o: CFLAGS += -fno-strict-aliasing
 plugins/dfxvideo/gpulib_if.o: plugins/dfxvideo/prim.c plugins/dfxvideo/soft.c
 OBJS += plugins/dfxvideo/gpulib_if.o
 endif
 ifeq "$(BUILTIN_GPU)" "unai"
+CFLAGS += -DGPU_UNAI
+CFLAGS += -DUSE_GPULIB=1
+#CFLAGS += -DINLINE="static __inline__"
+#CFLAGS += -Dasm="__asm__ __volatile__"
 OBJS += plugins/gpu_unai/gpulib_if.o
 ifeq "$(ARCH)" "arm"
 OBJS += plugins/gpu_unai/gpu_arm.o
@@ -140,6 +196,62 @@ endif
 
 # cdrcimg
 OBJS += plugins/cdrcimg/cdrcimg.o
+
+# libchdr
+ifeq "$(HAVE_CHD)" "1"
+CFLAGS += -Ideps/libchdr
+OBJS += deps/crypto/md5.o
+OBJS += deps/crypto/sha1.o
+OBJS += deps/flac-1.3.2/src/libFLAC/bitmath.o
+OBJS += deps/flac-1.3.2/src/libFLAC/bitreader.o
+OBJS += deps/flac-1.3.2/src/libFLAC/cpu.o
+OBJS += deps/flac-1.3.2/src/libFLAC/crc.o
+OBJS += deps/flac-1.3.2/src/libFLAC/fixed.o
+OBJS += deps/flac-1.3.2/src/libFLAC/fixed_intrin_sse2.o
+OBJS += deps/flac-1.3.2/src/libFLAC/fixed_intrin_ssse3.o
+OBJS += deps/flac-1.3.2/src/libFLAC/float.o
+OBJS += deps/flac-1.3.2/src/libFLAC/format.o
+OBJS += deps/flac-1.3.2/src/libFLAC/lpc.o
+OBJS += deps/flac-1.3.2/src/libFLAC/lpc_intrin_avx2.o
+OBJS += deps/flac-1.3.2/src/libFLAC/lpc_intrin_sse2.o
+OBJS += deps/flac-1.3.2/src/libFLAC/lpc_intrin_sse41.o
+OBJS += deps/flac-1.3.2/src/libFLAC/lpc_intrin_sse.o
+OBJS += deps/flac-1.3.2/src/libFLAC/md5.o
+OBJS += deps/flac-1.3.2/src/libFLAC/memory.o
+OBJS += deps/flac-1.3.2/src/libFLAC/metadata_iterators.o
+OBJS += deps/flac-1.3.2/src/libFLAC/metadata_object.o
+OBJS += deps/flac-1.3.2/src/libFLAC/stream_decoder.o
+OBJS += deps/flac-1.3.2/src/libFLAC/window.o
+OBJS += deps/lzma-16.04/C/Alloc.o
+OBJS += deps/lzma-16.04/C/Bra86.o
+OBJS += deps/lzma-16.04/C/Bra.o
+OBJS += deps/lzma-16.04/C/BraIA64.o
+OBJS += deps/lzma-16.04/C/CpuArch.o
+OBJS += deps/lzma-16.04/C/Delta.o
+OBJS += deps/lzma-16.04/C/LzFind.o
+OBJS += deps/lzma-16.04/C/Lzma86Dec.o
+OBJS += deps/lzma-16.04/C/Lzma86Enc.o
+OBJS += deps/lzma-16.04/C/LzmaDec.o
+OBJS += deps/lzma-16.04/C/LzmaEnc.o
+OBJS += deps/lzma-16.04/C/LzmaLib.o
+OBJS += deps/lzma-16.04/C/Sort.o
+OBJS += deps/libchdr/bitstream.o
+OBJS += deps/libchdr/cdrom.o
+OBJS += deps/libchdr/chd.o
+OBJS += deps/libchdr/flac.o
+OBJS += deps/libchdr/huffman.o
+
+ifneq (,$(findstring win,$(platform)))
+  CFLAGS += -DHAVE_FSEEKO
+  OBJS += deps/flac-1.3.2/src/libFLAC/windows_unicode_filenames.o
+else
+  CFLAGS += -DHAVE_SYS_PARAM_H
+endif
+
+CFLAGS += -Ideps/crypto -Ideps/flac-1.3.2/include -Ideps/flac-1.3.2/src/libFLAC/include -Ideps/flac-1.3.2/src/libFLAC/include -Ideps/lzma-16.04/C
+CFLAGS += -DHAVE_CHD -D'PACKAGE_VERSION="1.3.2"' -DFLAC__HAS_OGG=0 -DFLAC__NO_DLL -DHAVE_LROUND -DHAVE_STDINT_H -DHAVE_STDLIB_H -DFLAC__NO_DLL -D_7ZIP_ST
+LDFLAGS += -lm
+endif
 
 # dfinput
 OBJS += plugins/dfinput/main.o plugins/dfinput/pad.o plugins/dfinput/guncon.o
@@ -201,11 +313,14 @@ LDFLAGS += `pkg-config --libs glib-2.0 libosso dbus-1 hildon-fm-2`
 endif
 ifeq "$(PLATFORM)" "libretro"
 OBJS += frontend/libretro.o
+CFLAGS += -Ilibretro-common/include
 CFLAGS += -DFRONTEND_SUPPORTS_RGB565
 CFLAGS += -DHAVE_LIBRETRO
 
+ifneq ($(DYNAREC),lightrec)
 ifeq ($(MMAP_WIN32),1)
 OBJS += libpcsxcore/memmap_win32.o
+endif
 endif
 endif
 
@@ -258,7 +373,8 @@ frontend/revision.h: FORCE
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-
+%.o: %.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 target_: $(TARGET)
 

@@ -40,7 +40,9 @@ extern "C" {
 #include <math.h>
 #include <time.h>
 #include <ctype.h>
+#ifndef __SWITCH__
 #include <sys/types.h>
+#endif
 #include <assert.h>
 
 // Define types
@@ -118,7 +120,9 @@ typedef struct {
 	boolean Mdec;
 	boolean PsxAuto;
 	boolean Cdda;
+	boolean AsyncCD;
 	boolean HLE;
+	boolean SlowBoot;
 	boolean Debug;
 	boolean PsxOut;
 	boolean SpuIrq;

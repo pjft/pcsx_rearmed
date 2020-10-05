@@ -539,6 +539,7 @@ void cdrInterrupt() {
 	int start_rotating = 0;
 	int error = 0;
 	int delay;
+	unsigned int seekTime = 0;
 
 	// Reschedule IRQ
 	if (cdr.Stat) {
@@ -877,7 +878,8 @@ void cdrInterrupt() {
 			}
 			cdr.Result[0] |= (cdr.Result[1] >> 4) & 0x08;
 
-			strncpy((char *)&cdr.Result[4], "PCSX", 4);
+			/* This adds the string "PCSX" in Playstation bios boot screen */
+			memcpy((char *)&cdr.Result[4], "PCSX", 4);
 			cdr.Stat = Complete;
 			break;
 
@@ -909,6 +911,8 @@ void cdrInterrupt() {
 		case CdlReadN:
 		case CdlReadS:
 			if (cdr.SetlocPending) {
+				seekTime = abs(msf2sec(cdr.SetSectorPlay) - msf2sec(cdr.SetSector)) * (cdReadTime / 200);
+				if(seekTime > 1000000) seekTime = 1000000;
 				memcpy(cdr.SetSectorPlay, cdr.SetSector, 4);
 				cdr.SetlocPending = 0;
 			}
@@ -948,7 +952,7 @@ void cdrInterrupt() {
 				// - fix cutscene speech (startup)
 
 				// ??? - use more accurate seek time later
-				CDREAD_INT((cdr.Mode & 0x80) ? (cdReadTime / 2) : cdReadTime * 1);
+				CDREAD_INT(((cdr.Mode & 0x80) ? (cdReadTime / 2) : cdReadTime * 1) + seekTime);
 			} else {
 				cdr.StatP |= STATUS_READ;
 				cdr.StatP &= ~STATUS_SEEK;
@@ -1498,7 +1502,9 @@ int cdrFreeze(void *f, int Mode) {
 		pTransfer = cdr.Transfer + tmp;
 
 		// read right sub data
-		memcpy(tmpp, cdr.Prev, 3);
+		tmpp[0] = btoi(cdr.Prev[0]);
+		tmpp[1] = btoi(cdr.Prev[1]);
+		tmpp[2] = btoi(cdr.Prev[2]);
 		cdr.Prev[0]++;
 		ReadTrack(tmpp);
 
